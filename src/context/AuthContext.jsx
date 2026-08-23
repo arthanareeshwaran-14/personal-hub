@@ -1,4 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import { Capacitor } from "@capacitor/core";
+import { Browser } from "@capacitor/browser";
+import { App as CapApp } from "@capacitor/app";
 
 const AuthContext = createContext(null);
 
@@ -6,134 +9,273 @@ const GOOGLE_CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
   "808201271108-8k5tljs3ocmui1vu3vok9sveevm09fov.apps.googleusercontent.com";
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [accessToken, setAccessToken] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState(null);
+// Detect Electron runtime
+const IS_ELECTRON = typeof window !== "undefined" && !!window.electronAPI?.isElectron;
 
-  // On mount: restore session from localStorage and validate
+// Detect Capacitor Mobile runtime (Android / iOS)
+const IS_CAPACITOR = typeof window !== "undefined" && Capacitor.isNativePlatform();
+
+// OAuth loopback server port (must match electron/main.js OAUTH_PORT)
+const ELECTRON_OAUTH_PORT = 45678;
+
+// ── Redirect URIs ─────────────────────────────────────────────────────────────
+// Mobile APK:
+//   Opens Chrome Custom Tab → user signs in → Google redirects to GitHub Pages
+//   → GitHub Pages inline script detects token → redirects to personalhub:// scheme
+//   → Android intent catches it → app receives token via appUrlOpen listener
+//
+// Electron: loopback callback
+// Web: same origin
+const MOBILE_REDIRECT_URI = "https://arthanareeshwaran-14.github.io/personal-hub/";
+
+function getRedirectUri() {
+  if (IS_ELECTRON) return `http://127.0.0.1:${ELECTRON_OAUTH_PORT}/callback`;
+  if (IS_CAPACITOR) return MOBILE_REDIRECT_URI;
+  const origin = window.location.origin;
+  const isGHPages = window.location.pathname.includes("/personal-hub");
+  return isGHPages ? `${origin}/personal-hub/` : origin;
+}
+
+function buildAuthUrl(redirectUri) {
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: "token",
+    scope: "openid profile email https://www.googleapis.com/auth/drive.file",
+    prompt: "select_account",
+  });
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+}
+
+async function fetchGoogleProfile(token) {
+  const r = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok) throw new Error("Failed to fetch Google profile");
+  return r.json();
+}
+
+export function AuthProvider({ children }) {
+  const [user, setUser]               = useState(null);
+  const [accessToken, setAccessToken] = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [authError, setAuthError]     = useState(null);
+
+  // ── Persist / restore session ─────────────────────────────────────────────
   useEffect(() => {
-    const storedUser = localStorage.getItem("personalsite_user");
+    const storedUser  = localStorage.getItem("personalsite_user");
     const storedToken = localStorage.getItem("personalsite_token");
 
     if (storedUser && storedToken) {
       try {
-        const parsedUser = JSON.parse(storedUser);
-        if (!parsedUser.isDemo) {
-          setUser(parsedUser);
+        const parsed = JSON.parse(storedUser);
+        if (!parsed.isDemo) {
+          setUser(parsed);
           setAccessToken(storedToken);
 
-          // Background validation check with Google
+          // Silently validate the stored token with Google
           fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
             headers: { Authorization: `Bearer ${storedToken}` },
           })
             .then((r) => {
               if (r.status === 401) {
                 console.warn("[Auth] Stored Google token has expired.");
-                setAuthError("Google session expired. Please sign in again.");
-                signOut();
+                setAuthError("Your Google session expired. Please sign in again.");
+                performSignOut();
               }
             })
-            .catch(() => {});
+            .catch(() => {/* network errors — stay signed in */});
         } else {
-          signOut();
+          performSignOut();
         }
       } catch {
-        signOut();
+        performSignOut();
       }
     }
     setLoading(false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Redirect user to Google OAuth 2.0 endpoint
-  const signIn = useCallback(() => {
-    if (!GOOGLE_CLIENT_ID) {
-      alert("Google Client ID is not configured. Please add VITE_GOOGLE_CLIENT_ID in your .env file.");
+  // ── Shared: process a token fragment string "access_token=...&..." ────────
+  const handleTokenFragment = useCallback(async (fragment) => {
+    const params = new URLSearchParams(fragment);
+    const token  = params.get("access_token");
+    if (!token) {
+      setAuthError("Authentication failed — no token received.");
       return;
     }
-    setAuthError(null);
-    const redirectUri = window.location.origin + (window.location.pathname.includes("/personal-hub") ? "/personal-hub/" : "/");
-    const params = new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID,
-      redirect_uri: redirectUri.endsWith("/") ? redirectUri.slice(0, -1) : redirectUri,
-      response_type: "token",
-      scope: [
-        "openid",
-        "profile",
-        "email",
-        "https://www.googleapis.com/auth/drive",
-      ].join(" "),
-      include_granted_scopes: "true",
-      prompt: "consent select_account",
-    });
-    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-  }, []);
-
-  // Handle OAuth callback (token in URL hash)
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (!hash.includes("access_token")) return;
-
-    const params = new URLSearchParams(hash.slice(1));
-    const token = params.get("access_token");
-    if (!token) return;
-
-    // Clean hash from URL immediately
-    window.history.replaceState({}, document.title, window.location.pathname);
 
     setAccessToken(token);
     localStorage.setItem("personalsite_token", token);
     setAuthError(null);
 
-    fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error("Userinfo failed");
-        return r.json();
-      })
-      .then((data) => {
-        const u = {
-          name: data.name || data.email,
-          displayName: data.name || data.email?.split("@")[0],
-          email: data.email,
-          picture: data.picture || "",
-          sub: data.sub,
-          isDemo: false,
-        };
-        setUser(u);
-        localStorage.setItem("personalsite_user", JSON.stringify(u));
-      })
-      .catch((err) => {
-        console.error("Google userinfo error:", err);
-        setAuthError("Failed to fetch Google profile. Please try signing in again.");
-        signOut();
-      });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    try {
+      const data = await fetchGoogleProfile(token);
+      const u = {
+        name:        data.name  || data.email,
+        displayName: data.name  || data.email?.split("@")[0],
+        email:       data.email,
+        picture:     data.picture || "",
+        sub:         data.sub,
+        isDemo:      false,
+      };
 
+      // ── Clear stale cache if a DIFFERENT user is logging in ───────────────
+      const prevRaw = localStorage.getItem("personalsite_user");
+      if (prevRaw) {
+        try {
+          const prev = JSON.parse(prevRaw);
+          if (prev.sub && prev.sub !== data.sub) {
+            console.log("[Auth] Different user detected — clearing cached app data.");
+            Object.keys(localStorage)
+              .filter(k =>
+                k.startsWith("personalsite_file_") ||
+                k.startsWith("personalsite_media_") ||
+                k === "personalsite_root_folder" ||
+                k === "personalsite_vault_files"
+              )
+              .forEach(k => localStorage.removeItem(k));
+          }
+        } catch (_) {}
+      }
+
+      setUser(u);
+      localStorage.setItem("personalsite_user", JSON.stringify(u));
+    } catch (err) {
+      console.error("[Auth] Google profile fetch error:", err);
+      setAuthError("Failed to load your Google profile. Please try signing in again.");
+      performSignOut();
+    }
+  }, []);
+
+  // ── Capacitor Deep Link & App URL Listener ────────────────────────────────
+  // This catches the personalhub://callback#access_token=... deep link
+  // that GitHub Pages redirects to after Google OAuth completes.
+  useEffect(() => {
+    if (!IS_CAPACITOR) return;
+
+    let appUrlListener = null;
+
+    const setupListener = async () => {
+      appUrlListener = await CapApp.addListener("appUrlOpen", async (data) => {
+        console.log("[Auth] appUrlOpen received:", data.url);
+        if (!data?.url) return;
+        const urlStr = data.url;
+
+        // Extract access_token from either fragment (#) or query (?)
+        if (urlStr.includes("access_token")) {
+          const fragment = urlStr.includes("#")
+            ? urlStr.split("#")[1]
+            : urlStr.split("?")[1];
+          if (fragment) {
+            // Close the Chrome Custom Tab
+            try { await Browser.close(); } catch (_) {}
+            handleTokenFragment(fragment);
+          }
+        }
+      });
+    };
+
+    setupListener();
+
+    return () => {
+      if (appUrlListener && typeof appUrlListener.remove === "function") {
+        appUrlListener.remove();
+      }
+    };
+  }, [handleTokenFragment]);
+
+  // ── Sign-in ───────────────────────────────────────────────────────────────
+  const signIn = useCallback(async () => {
+    if (!GOOGLE_CLIENT_ID) {
+      alert("Google Client ID is not configured.");
+      return;
+    }
+    setAuthError(null);
+
+    const redirectUri = getRedirectUri();
+    const authUrl     = buildAuthUrl(redirectUri);
+
+    if (IS_ELECTRON) {
+      // ── Electron: open a secure popup BrowserWindow ──────────────────────
+      try {
+        const fragment = await window.electronAPI.openGoogleAuth(authUrl);
+        if (!fragment) throw new Error("No token fragment returned");
+        await handleTokenFragment(fragment);
+      } catch (err) {
+        if (err.message !== "cancelled") {
+          console.error("[Auth] Electron OAuth error:", err);
+          setAuthError("Sign-in failed. Please try again.");
+        }
+      }
+    } else if (IS_CAPACITOR) {
+      // ── Capacitor Android: open Chrome Custom Tab ─────────────────────────
+      // This opens a SEPARATE browser overlay (not the app's WebView).
+      // Flow: Google login → redirect to GitHub Pages → inline script detects
+      // token → redirects to personalhub://callback#token → Android catches
+      // the intent → appUrlOpen listener extracts token → login complete.
+      try {
+        await Browser.open({
+          url: authUrl,
+          presentationStyle: "popover",
+          toolbarColor: "#0f0f14",
+        });
+      } catch (err) {
+        console.error("[Auth] Capacitor browser open error:", err);
+        setAuthError("Could not open sign-in page. Please try again.");
+      }
+    } else {
+      // ── Web: direct navigation ───────────────────────────────────────────
+      window.location.href = authUrl;
+    }
+  }, [handleTokenFragment]);
+
+  // ── Handle token extracted from URL fragment (web redirect) ──────────────
+  useEffect(() => {
+    if (IS_ELECTRON || IS_CAPACITOR) return;
+    const hash = window.location.hash;
+    if (!hash.includes("access_token")) return;
+
+    // Clean hash from URL immediately
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    const params = new URLSearchParams(hash.slice(1));
+    const token  = params.get("access_token");
+    if (token) handleTokenFragment(hash.slice(1));
+  }, [handleTokenFragment]);
+
+  // ── Token expiry during API calls ─────────────────────────────────────────
   const handleTokenExpired = useCallback(() => {
     console.warn("[Auth] Token expired during API call.");
-    setAuthError("Google session expired. Please sign in again.");
-    signOut();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    setAuthError("Your Google session expired. Please sign in again.");
+    performSignOut();
+  }, []);
 
-  const signOut = useCallback(() => {
+  // ── Sign-out ──────────────────────────────────────────────────────────────
+  function performSignOut() {
     setUser(null);
     setAccessToken(null);
     localStorage.removeItem("personalsite_user");
     localStorage.removeItem("personalsite_token");
+  }
+
+  const signOut = useCallback(() => {
+    performSignOut();
   }, []);
 
-  const value = useMemo(() => ({
-    user,
-    accessToken,
-    loading,
-    authError,
-    signIn,
-    signOut,
-    handleTokenExpired,
-  }), [user, accessToken, loading, authError, signIn, signOut, handleTokenExpired]);
+  const value = useMemo(
+    () => ({
+      user,
+      accessToken,
+      loading,
+      authError,
+      signIn,
+      signOut,
+      handleTokenExpired,
+      isElectron: IS_ELECTRON,
+      isCapacitor: IS_CAPACITOR,
+    }),
+    [user, accessToken, loading, authError, signIn, signOut, handleTokenExpired]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
