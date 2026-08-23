@@ -9,6 +9,43 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+      // ── OAuth Deep-Link Bridge ────────────────────────────────────────────
+      // This runs BEFORE React loads. When GitHub Pages receives the OAuth
+      // redirect with #access_token=..., this script immediately redirects
+      // to the Android app's custom URL scheme so the token reaches the APK.
+      // On desktop browsers this does nothing — the React app handles it.
+      (function() {
+        var hash = window.location.hash || '';
+        if (hash.indexOf('access_token') === -1) return; // No token — skip
+
+        var fragment = hash.substring(1); // Remove the leading #
+        var isMobile = /Android/i.test(navigator.userAgent);
+
+        if (isMobile) {
+          // Try the personalhub:// scheme first (matches AndroidManifest intent filter)
+          var deepLink = 'personalhub://callback#' + fragment;
+          window.location.href = deepLink;
+
+          // Fallback: if the first scheme doesn't work, try the package-style scheme
+          setTimeout(function() {
+            window.location.href = 'com.eshwaran.personalhub://callback#' + fragment;
+          }, 500);
+
+          // Final fallback: show a "return to app" button after 2 seconds
+          setTimeout(function() {
+            document.body.innerHTML =
+              '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:Inter,sans-serif;background:#0f0f14;color:#fff;text-align:center;padding:20px;">' +
+                '<h2 style="margin-bottom:16px;">✅ Login Successful!</h2>' +
+                '<p style="color:#aaa;margin-bottom:24px;">If the app didn\'t open automatically, tap the button below.</p>' +
+                '<a href="' + deepLink + '" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:14px 32px;border-radius:12px;text-decoration:none;font-weight:600;font-size:16px;">Open Personal Hub</a>' +
+                '<p style="color:#666;margin-top:24px;font-size:13px;">Or close this tab and open the app manually.</p>' +
+              '</div>';
+          }, 2000);
+        }
+        // On desktop: do nothing — the React app's AuthContext hash watcher handles it
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
