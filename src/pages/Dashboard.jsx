@@ -61,6 +61,10 @@ export default function Dashboard() {
                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 14, background: "rgba(245,158,11,0.08)", color: "#d97706", fontSize: "0.86rem", fontWeight: 700 }}>
                   <UserCheck size={15} /> Guest Mode (Local Storage)
                 </div>
+              ) : user?.isBasic ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 14, background: "rgba(99,102,241,0.08)", color: "#4f46e5", fontSize: "0.86rem", fontWeight: 700 }}>
+                  <UserCheck size={15} /> College Account ({user.email.split("@")[1] || "Work"})
+                </div>
               ) : driveError ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 14, background: "rgba(239,68,68,0.08)", color: "#dc2626", fontSize: "0.86rem", fontWeight: 700 }}>
                   <AlertCircle size={15} /> Drive Error

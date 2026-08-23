@@ -29,12 +29,16 @@ function getRedirectUri() {
   return isGHPages ? `${origin}/personal-hub/` : origin;
 }
 
-function buildAuthUrl(redirectUri) {
+function buildAuthUrl(redirectUri, type = "drive") {
+  const scope = type === "basic"
+    ? "openid profile email"
+    : "openid profile email https://www.googleapis.com/auth/drive.file";
+
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: redirectUri,
     response_type: "token",
-    scope: "openid profile email https://www.googleapis.com/auth/drive.file",
+    scope: scope,
     prompt: "select_account",
   });
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
@@ -102,6 +106,9 @@ export function AuthProvider({ children }) {
   const handleTokenFragment = useCallback(async (fragment) => {
     const params = new URLSearchParams(fragment);
     const token  = params.get("access_token");
+    const scope  = params.get("scope") || "";
+    const isBasicScope = !scope.includes("drive");
+
     if (!token) {
       setAuthError("Authentication failed — no token received.");
       return;
@@ -120,6 +127,7 @@ export function AuthProvider({ children }) {
         picture:     data.picture || "",
         sub:         data.sub,
         isGuest:     false,
+        isBasic:     isBasicScope,
         isDemo:      false,
       };
 
@@ -183,8 +191,8 @@ export function AuthProvider({ children }) {
     };
   }, [handleTokenFragment]);
 
-  // ── Sign-in with Google ───────────────────────────────────────────────────
-  const signIn = useCallback(async () => {
+  // ── Sign-in with Google (Drive scope or Basic scope) ───────────────────────
+  const signIn = useCallback(async (type = "drive") => {
     if (!GOOGLE_CLIENT_ID) {
       alert("Google Client ID is not configured.");
       return;
@@ -192,7 +200,7 @@ export function AuthProvider({ children }) {
     setAuthError(null);
 
     const redirectUri = getRedirectUri();
-    const authUrl     = buildAuthUrl(redirectUri);
+    const authUrl     = buildAuthUrl(redirectUri, type);
 
     if (IS_ELECTRON) {
       try {
@@ -221,7 +229,7 @@ export function AuthProvider({ children }) {
     }
   }, [handleTokenFragment]);
 
-  // ── Guest Mode Sign-in (Available across Web, EXE, and APK) ───────────────
+  // ── Guest Mode Sign-in (Instant Access) ───────────────────────────────────
   const signInAsGuest = useCallback(() => {
     setAuthError(null);
     const guestUser = {
@@ -231,6 +239,7 @@ export function AuthProvider({ children }) {
       picture: "",
       sub: "guest_" + Date.now(),
       isGuest: true,
+      isBasic: false,
       isDemo: false,
     };
     setUser(guestUser);
@@ -243,13 +252,18 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (IS_ELECTRON || IS_CAPACITOR) return;
     const hash = window.location.hash;
-    if (!hash.includes("access_token")) return;
+    if (!hash || !hash.includes("access_token")) return;
 
-    window.history.replaceState({}, document.title, window.location.pathname);
-
-    const params = new URLSearchParams(hash.slice(1));
+    const rawFragment = hash.startsWith("#") ? hash.slice(1) : hash;
+    const params = new URLSearchParams(rawFragment);
     const token  = params.get("access_token");
-    if (token) handleTokenFragment(hash.slice(1));
+
+    // Clean hash from URL and set route to /#/dashboard
+    window.location.hash = "#/dashboard";
+
+    if (token) {
+      handleTokenFragment(rawFragment);
+    }
   }, [handleTokenFragment]);
 
   // ── Token expiry during API calls ─────────────────────────────────────────
@@ -272,6 +286,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const isGuest = useMemo(() => !!user?.isGuest, [user]);
+  const isBasic = useMemo(() => !!user?.isBasic, [user]);
 
   const value = useMemo(
     () => ({
@@ -280,6 +295,7 @@ export function AuthProvider({ children }) {
       loading,
       authError,
       isGuest,
+      isBasic,
       signIn,
       signInAsGuest,
       signOut,
@@ -287,7 +303,7 @@ export function AuthProvider({ children }) {
       isElectron: IS_ELECTRON,
       isCapacitor: IS_CAPACITOR,
     }),
-    [user, accessToken, loading, authError, isGuest, signIn, signInAsGuest, signOut, handleTokenExpired]
+    [user, accessToken, loading, authError, isGuest, isBasic, signIn, signInAsGuest, signOut, handleTokenExpired]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -3,81 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Personal Hub</title>
+    <title>Personal Hub — Portfolio & Command Center</title>
     <meta name="description" content="Professional portfolio, future roadmap, task manager and personal dashboard." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
     <style>
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
         padding: 0;
-        background-color: #0b0c10;
-        color: #e5e7eb;
+        background-color: #ffffff;
+        color: #0f172a;
         font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        min-height: 100vh;
       }
-      #oauth-return-overlay {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: #0b0c10;
-        z-index: 999999;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-        text-align: center;
-      }
-      .oauth-spinner {
-        width: 48px;
-        height: 48px;
-        border: 4px solid rgba(99, 102, 241, 0.2);
-        border-top-color: #6366f1;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-        margin-bottom: 24px;
-      }
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-      .oauth-btn {
-        display: inline-block;
-        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-        color: #ffffff;
-        font-size: 1.05rem;
-        font-weight: 700;
-        padding: 16px 32px;
-        border-radius: 14px;
-        text-decoration: none;
-        box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
-        margin-top: 18px;
-        transition: transform 0.2s ease;
-      }
-      .oauth-btn:active {
-        transform: scale(0.97);
+      #root {
+        min-height: 100vh;
       }
     </style>
   </head>
   <body>
-    <!-- Instant visual overlay shown during OAuth return on mobile -->
-    <div id="oauth-return-overlay">
-      <div class="oauth-spinner"></div>
-      <h2 style="font-size: 1.5rem; font-weight: 800; margin: 0 0 10px 0; color: #fff;">
-        Authentication Successful!
-      </h2>
-      <p style="color: #9ca3af; font-size: 0.95rem; max-width: 320px; line-height: 1.5; margin: 0 0 12px 0;">
-        Redirecting you back to your Personal Hub application...
-      </p>
-      <a id="oauth-open-btn" class="oauth-btn" href="#">Open Personal Hub</a>
-      <p style="color: #6b7280; font-size: 0.8rem; margin-top: 20px;">
-        If the app doesn't open automatically, tap the button above.
-      </p>
-    </div>
-
     <div id="root"></div>
 
     <script>
-      // ── Instant OAuth Deep-Link Bridge ─────────────────────────────────────
+      // ── Capacitor Mobile Deep-Link Trigger ─────────────────────────────────
       (function() {
         var hash = window.location.hash || '';
         var search = window.location.search || '';
@@ -85,37 +37,15 @@
           ? hash.substring(1)
           : ((search.indexOf('access_token') !== -1) ? search.substring(1) : '');
 
-        if (!tokenStr) return; // Standard page view — let React mount
+        if (!tokenStr) return;
 
-        var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-        if (isMobile) {
-          // Show the instant branded return overlay
-          var overlay = document.getElementById('oauth-return-overlay');
-          if (overlay) overlay.style.display = 'flex';
-
-          var intentUrl = 'intent://callback#' + tokenStr + '#Intent;scheme=personalhub;package=com.eshwaran.personalhub;end';
+        // If returned in a standalone mobile custom tab for the APK, ping the app scheme
+        var isMobile = /Android/i.test(navigator.userAgent);
+        if (isMobile && !window.location.hash.startsWith('#/')) {
           var customSchemeUrl = 'personalhub://callback#' + tokenStr;
-
-          var openBtn = document.getElementById('oauth-open-btn');
-          if (openBtn) {
-            openBtn.href = customSchemeUrl;
-            openBtn.onclick = function() {
-              window.location.href = customSchemeUrl;
-            };
-          }
-
-          // 1. Try immediate custom scheme navigation
           try {
             window.location.href = customSchemeUrl;
           } catch(e) {}
-
-          // 2. Fallback to Android intent scheme
-          setTimeout(function() {
-            try {
-              window.location.href = intentUrl;
-            } catch(e) {}
-          }, 600);
         }
       })();
     </script>

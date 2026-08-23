@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { DriveProvider } from "./context/DriveContext";
@@ -62,7 +62,7 @@ function AppRoutes() {
       <Route path="/p/live" element={<PublicPortfolioView />} />
       <Route path="/portfolio/view" element={<PublicPortfolioView />} />
 
-      {/* Private workspace — requires Google sign-in */}
+      {/* Private workspace */}
       <Route path="/dashboard"     element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/profile"       element={<PrivateRoute><Profile /></PrivateRoute>} />
       <Route path="/portfolio-hub" element={<PrivateRoute><PortfolioHub /></PrivateRoute>} />
@@ -83,9 +83,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <HashRouter>
           <AppRoutes />
-        </BrowserRouter>
+        </HashRouter>
       </AuthProvider>
     </ThemeProvider>
   );
