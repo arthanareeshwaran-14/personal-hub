@@ -33,7 +33,7 @@ export default function Dashboard() {
   return (
     <div style={{ display: "flex" }}>
       <Sidebar />
-      <main className="main-content" style={{ marginLeft: 64 }}>
+      <main className="main-content">
         <div style={{ maxWidth: 1160, margin: "0 auto", width: "100%" }}>
           
           {/* Header */}
@@ -57,7 +57,11 @@ export default function Dashboard() {
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 14, background: "var(--badge-bg)", color: "var(--primary-dark)", fontSize: "0.86rem", fontWeight: 700, border: "1px solid var(--border)", transition: "all 0.3s ease" }}>
                 <Palette size={15} /> {activeTheme.name}
               </div>
-              {driveError ? (
+              {user?.isGuest ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 14, background: "rgba(245,158,11,0.08)", color: "#d97706", fontSize: "0.86rem", fontWeight: 700 }}>
+                  <UserCheck size={15} /> Guest Mode (Local Storage)
+                </div>
+              ) : driveError ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 14, background: "rgba(239,68,68,0.08)", color: "#dc2626", fontSize: "0.86rem", fontWeight: 700 }}>
                   <AlertCircle size={15} /> Drive Error
                 </div>

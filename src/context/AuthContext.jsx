@@ -19,13 +19,6 @@ const IS_CAPACITOR = typeof window !== "undefined" && Capacitor.isNativePlatform
 const ELECTRON_OAUTH_PORT = 45678;
 
 // ── Redirect URIs ─────────────────────────────────────────────────────────────
-// Mobile APK:
-//   Opens Chrome Custom Tab → user signs in → Google redirects to GitHub Pages
-//   → GitHub Pages inline script detects token → redirects to personalhub:// scheme
-//   → Android intent catches it → app receives token via appUrlOpen listener
-//
-// Electron: loopback callback
-// Web: same origin
 const MOBILE_REDIRECT_URI = "https://arthanareeshwaran-14.github.io/personal-hub/";
 
 function getRedirectUri() {
@@ -36,17 +29,12 @@ function getRedirectUri() {
   return isGHPages ? `${origin}/personal-hub/` : origin;
 }
 
-function buildAuthUrl(redirectUri, mode = "drive") {
-  const scope =
-    mode === "basic"
-      ? "openid profile email"
-      : "openid profile email https://www.googleapis.com/auth/drive.file";
-
+function buildAuthUrl(redirectUri) {
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: redirectUri,
     response_type: "token",
-    scope: scope,
+    scope: "openid profile email https://www.googleapis.com/auth/drive.file",
     prompt: "select_account",
   });
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
@@ -71,14 +59,24 @@ export function AuthProvider({ children }) {
     const storedUser  = localStorage.getItem("personalsite_user");
     const storedToken = localStorage.getItem("personalsite_token");
 
-    if (storedUser && storedToken) {
+    if (storedUser) {
       try {
         const parsed = JSON.parse(storedUser);
-        if (!parsed.isDemo) {
+
+        // Guest user session restore
+        if (parsed.isGuest) {
+          setUser(parsed);
+          setAccessToken(null);
+          setLoading(false);
+          return;
+        }
+
+        // Google authenticated user session restore
+        if (storedToken && !parsed.isDemo) {
           setUser(parsed);
           setAccessToken(storedToken);
 
-          // Silently validate the stored token with Google
+          // Silently validate stored token with Google
           fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
             headers: { Authorization: `Bearer ${storedToken}` },
           })
@@ -121,10 +119,11 @@ export function AuthProvider({ children }) {
         email:       data.email,
         picture:     data.picture || "",
         sub:         data.sub,
+        isGuest:     false,
         isDemo:      false,
       };
 
-      // ── Clear stale cache if a DIFFERENT user is logging in ───────────────
+      // Clear stale cache if a DIFFERENT user is logging in
       const prevRaw = localStorage.getItem("personalsite_user");
       if (prevRaw) {
         try {
@@ -152,9 +151,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // ── Capacitor Deep Link & App URL Listener ────────────────────────────────
-  // This catches the personalhub://callback#access_token=... deep link
-  // that GitHub Pages redirects to after Google OAuth completes.
+  // ── Capacitor Deep Link Listener for Mobile APK ───────────────────────────
   useEffect(() => {
     if (!IS_CAPACITOR) return;
 
@@ -162,17 +159,14 @@ export function AuthProvider({ children }) {
 
     const setupListener = async () => {
       appUrlListener = await CapApp.addListener("appUrlOpen", async (data) => {
-        console.log("[Auth] appUrlOpen received:", data.url);
         if (!data?.url) return;
         const urlStr = data.url;
 
-        // Extract access_token from either fragment (#) or query (?)
         if (urlStr.includes("access_token")) {
           const fragment = urlStr.includes("#")
             ? urlStr.split("#")[1]
             : urlStr.split("?")[1];
           if (fragment) {
-            // Close the Chrome Custom Tab
             try { await Browser.close(); } catch (_) {}
             handleTokenFragment(fragment);
           }
@@ -189,8 +183,8 @@ export function AuthProvider({ children }) {
     };
   }, [handleTokenFragment]);
 
-  // ── Sign-in ───────────────────────────────────────────────────────────────
-  const signIn = useCallback(async (mode = "drive") => {
+  // ── Sign-in with Google ───────────────────────────────────────────────────
+  const signIn = useCallback(async () => {
     if (!GOOGLE_CLIENT_ID) {
       alert("Google Client ID is not configured.");
       return;
@@ -198,10 +192,9 @@ export function AuthProvider({ children }) {
     setAuthError(null);
 
     const redirectUri = getRedirectUri();
-    const authUrl     = buildAuthUrl(redirectUri, mode);
+    const authUrl     = buildAuthUrl(redirectUri);
 
     if (IS_ELECTRON) {
-      // ── Electron: open a secure popup BrowserWindow ──────────────────────
       try {
         const fragment = await window.electronAPI.openGoogleAuth(authUrl);
         if (!fragment) throw new Error("No token fragment returned");
@@ -213,26 +206,38 @@ export function AuthProvider({ children }) {
         }
       }
     } else if (IS_CAPACITOR) {
-      // ── Capacitor Android: open Chrome Custom Tab ─────────────────────────
-      // This opens a SEPARATE browser overlay (not the app's WebView).
-      // Flow: Google login → redirect to GitHub Pages → inline script detects
-      // token → redirects to personalhub://callback#token → Android catches
-      // the intent → appUrlOpen listener extracts token → login complete.
       try {
         await Browser.open({
           url: authUrl,
           presentationStyle: "popover",
-          toolbarColor: "#0f0f14",
+          toolbarColor: "#0b0c10",
         });
       } catch (err) {
         console.error("[Auth] Capacitor browser open error:", err);
         setAuthError("Could not open sign-in page. Please try again.");
       }
     } else {
-      // ── Web: direct navigation ───────────────────────────────────────────
       window.location.href = authUrl;
     }
   }, [handleTokenFragment]);
+
+  // ── Guest Mode Sign-in (Available across Web, EXE, and APK) ───────────────
+  const signInAsGuest = useCallback(() => {
+    setAuthError(null);
+    const guestUser = {
+      name: "Guest Explorer",
+      displayName: "Guest",
+      email: "guest@personalhub.local",
+      picture: "",
+      sub: "guest_" + Date.now(),
+      isGuest: true,
+      isDemo: false,
+    };
+    setUser(guestUser);
+    setAccessToken(null);
+    localStorage.setItem("personalsite_user", JSON.stringify(guestUser));
+    localStorage.removeItem("personalsite_token");
+  }, []);
 
   // ── Handle token extracted from URL fragment (web redirect) ──────────────
   useEffect(() => {
@@ -240,7 +245,6 @@ export function AuthProvider({ children }) {
     const hash = window.location.hash;
     if (!hash.includes("access_token")) return;
 
-    // Clean hash from URL immediately
     window.history.replaceState({}, document.title, window.location.pathname);
 
     const params = new URLSearchParams(hash.slice(1));
@@ -267,19 +271,23 @@ export function AuthProvider({ children }) {
     performSignOut();
   }, []);
 
+  const isGuest = useMemo(() => !!user?.isGuest, [user]);
+
   const value = useMemo(
     () => ({
       user,
       accessToken,
       loading,
       authError,
+      isGuest,
       signIn,
+      signInAsGuest,
       signOut,
       handleTokenExpired,
       isElectron: IS_ELECTRON,
       isCapacitor: IS_CAPACITOR,
     }),
-    [user, accessToken, loading, authError, signIn, signOut, handleTokenExpired]
+    [user, accessToken, loading, authError, isGuest, signIn, signInAsGuest, signOut, handleTokenExpired]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

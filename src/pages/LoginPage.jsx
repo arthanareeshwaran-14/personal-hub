@@ -5,7 +5,7 @@ import { LogIn, Shield, HardDrive, Lock, FolderSync, Layers } from "lucide-react
 import { motion } from "framer-motion";
 
 export default function LoginPage() {
-  const { user, signIn, authError } = useAuth();
+  const { user, signIn, signInAsGuest, authError } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -202,7 +202,7 @@ export default function LoginPage() {
           <motion.button
             whileHover={{ scale: 1.02, boxShadow: "0 10px 28px var(--border)" }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => signIn("drive")}
+            onClick={() => signIn()}
             style={{
               width: "100%",
               display: "flex",
@@ -227,7 +227,7 @@ export default function LoginPage() {
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="rgba(255,255,255,0.9)" />
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="rgba(255,255,255,0.9)" />
             </svg>
-            Continue with Google (Cloud Sync)
+            Sign in with Google
           </motion.button>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0" }}>
@@ -239,7 +239,8 @@ export default function LoginPage() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => signIn("basic")}
+            onClick={signInAsGuest}
+            id="guest-btn"
             style={{
               width: "100%",
               display: "flex",
@@ -247,8 +248,8 @@ export default function LoginPage() {
               justifyContent: "center",
               gap: 10,
               padding: "13px",
-              fontSize: "0.92rem",
-              fontWeight: 700,
+              fontSize: "0.95rem",
+              fontWeight: 800,
               borderRadius: 14,
               border: "1.5px solid var(--border)",
               cursor: "pointer",
@@ -258,7 +259,7 @@ export default function LoginPage() {
               transition: "all 0.2s ease",
             }}
           >
-            🎓 Sign in with College / Work Account
+            👤 Continue as Guest
           </motion.button>
 
           <div
@@ -271,7 +272,7 @@ export default function LoginPage() {
             }}
           >
             <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
-              💡 <strong>College/Work emails (e.g. @kongu.edu):</strong> Use the <em>College / Work Account</em> option to sign in without organization Drive policy restrictions.
+              ⚡ <strong>Guest Mode:</strong> Instant access to all local workspace features. Sign in with Google anytime to unlock Cloud Drive Vault sync.
             </div>
           </div>
         </motion.div>
