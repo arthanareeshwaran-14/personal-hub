@@ -36,12 +36,17 @@ function getRedirectUri() {
   return isGHPages ? `${origin}/personal-hub/` : origin;
 }
 
-function buildAuthUrl(redirectUri) {
+function buildAuthUrl(redirectUri, mode = "drive") {
+  const scope =
+    mode === "basic"
+      ? "openid profile email"
+      : "openid profile email https://www.googleapis.com/auth/drive.file";
+
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: redirectUri,
     response_type: "token",
-    scope: "openid profile email https://www.googleapis.com/auth/drive.file",
+    scope: scope,
     prompt: "select_account",
   });
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
@@ -185,7 +190,7 @@ export function AuthProvider({ children }) {
   }, [handleTokenFragment]);
 
   // ── Sign-in ───────────────────────────────────────────────────────────────
-  const signIn = useCallback(async () => {
+  const signIn = useCallback(async (mode = "drive") => {
     if (!GOOGLE_CLIENT_ID) {
       alert("Google Client ID is not configured.");
       return;
@@ -193,7 +198,7 @@ export function AuthProvider({ children }) {
     setAuthError(null);
 
     const redirectUri = getRedirectUri();
-    const authUrl     = buildAuthUrl(redirectUri);
+    const authUrl     = buildAuthUrl(redirectUri, mode);
 
     if (IS_ELECTRON) {
       // ── Electron: open a secure popup BrowserWindow ──────────────────────

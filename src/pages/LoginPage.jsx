@@ -202,7 +202,7 @@ export default function LoginPage() {
           <motion.button
             whileHover={{ scale: 1.02, boxShadow: "0 10px 28px var(--border)" }}
             whileTap={{ scale: 0.98 }}
-            onClick={signIn}
+            onClick={() => signIn("drive")}
             style={{
               width: "100%",
               display: "flex",
@@ -227,20 +227,51 @@ export default function LoginPage() {
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="rgba(255,255,255,0.9)" />
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="rgba(255,255,255,0.9)" />
             </svg>
-            Continue with Google
+            Continue with Google (Cloud Sync)
+          </motion.button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0" }}>
+            <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+            <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>or</span>
+            <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+          </div>
+
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => signIn("basic")}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              padding: "13px",
+              fontSize: "0.92rem",
+              fontWeight: 700,
+              borderRadius: 14,
+              border: "1.5px solid var(--border)",
+              cursor: "pointer",
+              background: "var(--bg-secondary)",
+              color: "var(--text-primary)",
+              boxShadow: "0 2px 8px var(--border)",
+              transition: "all 0.2s ease",
+            }}
+          >
+            🎓 Sign in with College / Work Account
           </motion.button>
 
           <div
             style={{
-              marginTop: 24,
-              padding: "14px 16px",
+              marginTop: 20,
+              padding: "12px 14px",
               borderRadius: 12,
               background: "var(--bg-secondary)",
               border: "1px solid var(--border)"
             }}
           >
-            <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.5 }}>
-              🔒 This app uses Google OAuth 2.0. Your data is only stored in your personal Google Drive and is never sent to any third-party server.
+            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
+              💡 <strong>College/Work emails (e.g. @kongu.edu):</strong> Use the <em>College / Work Account</em> option to sign in without organization Drive policy restrictions.
             </div>
           </div>
         </motion.div>
