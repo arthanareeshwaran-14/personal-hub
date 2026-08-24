@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Personal Hub — Signing In...</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 20px;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #0f0f14 0%, #1a1a2e 100%);
+      color: #fff;
+    }
+    .logo {
+      width: 64px; height: 64px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+      box-shadow: 0 8px 32px rgba(99,102,241,0.4);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 8px 32px rgba(99,102,241,0.4); }
+      50% { box-shadow: 0 8px 48px rgba(99,102,241,0.7); }
+    }
+    h1 { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.5px; }
+    p { color: rgba(255,255,255,0.6); font-size: 0.9rem; }
+    .error {
+      background: rgba(239,68,68,0.15);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 12px;
+      padding: 14px 20px;
+      color: #f87171;
+      font-size: 0.85rem;
+      max-width: 340px;
+      text-align: center;
+      display: none;
+    }
+    .btn {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 13px 28px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: none;
+      text-decoration: none;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">🔐</div>
+  <h1>Completing Sign In...</h1>
+  <p id="status-msg">Returning you to Personal Hub</p>
+  <div class="error" id="error-box">
+    Could not automatically return to the app.<br>
+    Tap the button below to continue.
+  </div>
+  <a class="btn" id="open-app-btn" href="#">Open Personal Hub</a>
+
+  <script>
+    (function() {
+      // Extract the token fragment from the URL
+      // Google sends: https://.../oauth-callback.html#access_token=...&...
+      var hash   = window.location.hash || '';
+      var search = window.location.search || '';
+
+      var tokenStr = '';
+      if (hash.indexOf('access_token') !== -1) {
+        tokenStr = hash.startsWith('#') ? hash.slice(1) : hash;
+      } else if (search.indexOf('access_token') !== -1) {
+        tokenStr = search.startsWith('?') ? search.slice(1) : search;
+      }
+
+      var errorBox = document.getElementById('error-box');
+      var openBtn  = document.getElementById('open-app-btn');
+      var statusMsg = document.getElementById('status-msg');
+
+      if (!tokenStr) {
+        // No token — maybe user cancelled or an error occurred
+        statusMsg.textContent = 'Sign-in was cancelled or an error occurred.';
+        errorBox.style.display = 'block';
+        openBtn.href = 'personalhub://callback';
+        openBtn.textContent = 'Return to Personal Hub';
+        openBtn.style.display = 'inline-block';
+        return;
+      }
+
+      // Build the deep-link URL for the Android app
+      var deepLink = 'personalhub://callback#' + tokenStr;
+      openBtn.href = deepLink;
+      openBtn.textContent = 'Open Personal Hub';
+
+      // Try to navigate to the deep link — Android intercepts this immediately
+      try {
+        window.location.replace(deepLink);
+      } catch(e) {
+        // Silent fallback — show button
+      }
+
+      // After 1.5s, if user is still here, show manual button
+      setTimeout(function() {
+        errorBox.style.display = 'block';
+        openBtn.style.display = 'inline-block';
+        statusMsg.textContent = 'Almost there! Tap the button to open the app.';
+      }, 1500);
+    })();
+  </script>
+</body>
+</html>
