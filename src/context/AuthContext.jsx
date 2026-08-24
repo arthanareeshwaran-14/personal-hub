@@ -19,7 +19,9 @@ const IS_CAPACITOR = typeof window !== "undefined" && Capacitor.isNativePlatform
 const ELECTRON_OAUTH_PORT = 45678;
 
 // ── Redirect URIs ─────────────────────────────────────────────────────────────
-const MOBILE_REDIRECT_URI = "https://arthanareeshwaran-14.github.io/personal-hub/";
+// For mobile APK: Google OAuth redirects to the dedicated callback page on GitHub Pages.
+// That page has zero React dependencies and immediately redirects to personalhub://callback.
+const MOBILE_REDIRECT_URI = "https://arthanareeshwaran-14.github.io/personal-hub/oauth-callback.html";
 
 function getRedirectUri() {
   if (IS_ELECTRON) return `http://127.0.0.1:${ELECTRON_OAUTH_PORT}/callback`;
@@ -160,6 +162,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   // ── Capacitor Deep Link Listener for Mobile APK ───────────────────────────
+  // When Google redirects to personalhub://callback#access_token=...
+  // Android fires the appUrlOpen event which we catch here.
   useEffect(() => {
     if (!IS_CAPACITOR) return;
 
@@ -167,17 +171,26 @@ export function AuthProvider({ children }) {
 
     const setupListener = async () => {
       appUrlListener = await CapApp.addListener("appUrlOpen", async (data) => {
+        console.log("[Auth] appUrlOpen fired:", data?.url);
         if (!data?.url) return;
         const urlStr = data.url;
 
         if (urlStr.includes("access_token")) {
-          const fragment = urlStr.includes("#")
-            ? urlStr.split("#")[1]
-            : urlStr.split("?")[1];
-          if (fragment) {
-            try { await Browser.close(); } catch (_) {}
-            handleTokenFragment(fragment);
+          // Extract fragment from either # or ? separator
+          let fragment = "";
+          if (urlStr.includes("#")) {
+            fragment = urlStr.split("#")[1];
+          } else if (urlStr.includes("?")) {
+            fragment = urlStr.split("?")[1];
           }
+          if (fragment) {
+            // Close the Custom Tab / browser
+            try { await Browser.close(); } catch (_) {}
+            await handleTokenFragment(fragment);
+          }
+        } else if (urlStr.includes("personalhub://")) {
+          // Handle any other deep link navigation (e.g. personalhub://dashboard)
+          try { await Browser.close(); } catch (_) {}
         }
       });
     };
@@ -189,6 +202,31 @@ export function AuthProvider({ children }) {
         appUrlListener.remove();
       }
     };
+  }, [handleTokenFragment]);
+
+  // ── Handle token from app launch URL (cold-start deep link) ──────────────
+  useEffect(() => {
+    if (!IS_CAPACITOR) return;
+
+    const checkLaunchUrl = async () => {
+      try {
+        const launchUrl = await CapApp.getLaunchUrl();
+        if (launchUrl?.url && launchUrl.url.includes("access_token")) {
+          const urlStr = launchUrl.url;
+          const fragment = urlStr.includes("#")
+            ? urlStr.split("#")[1]
+            : urlStr.split("?")[1];
+          if (fragment) {
+            try { await Browser.close(); } catch (_) {}
+            await handleTokenFragment(fragment);
+          }
+        }
+      } catch (err) {
+        console.warn("[Auth] getLaunchUrl error:", err);
+      }
+    };
+
+    checkLaunchUrl();
   }, [handleTokenFragment]);
 
   // ── Sign-in with Google (Drive scope or Basic scope) ───────────────────────
