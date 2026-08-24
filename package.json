@@ -1,28 +1,87 @@
 {
-  "name": "personalsite",
+  "name": "personal-hub",
+  "productName": "Personal Hub",
+  "description": "A personal productivity hub — manage your roadmap, documents, portfolio and todos.",
+  "author": {
+    "name": "Arthanareeshwaran",
+    "email": "nagarajamutha0@gmail.com"
+  },
   "private": true,
   "version": "1.0.0",
-  "type": "module",
-  "homepage": "https://arthanareeshwaran-14.github.io/personal-hub",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
+    "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
     "build": "vite build",
+    "build:electron": "vite build && electron-builder",
+    "build:apk": "powershell -ExecutionPolicy Bypass -File ./scripts/build-apk.ps1",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/keyboard": "^8.0.5",
+    "@capacitor/status-bar": "^8.0.3",
+    "@vitejs/plugin-react": "^6.0.4",
     "date-fns": "^4.4.0",
     "framer-motion": "^13.1.0",
     "lucide-react": "^1.33.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.2"
+    "react-router-dom": "^7.18.2",
+    "vite": "^8.2.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.4",
+    "concurrently": "^9.2.0",
+    "cross-env": "^10.1.0",
+    "electron": "^36.4.0",
+    "electron-builder": "^26.0.12",
     "oxlint": "^1.75.0",
-    "vite": "^8.2.0"
+    "wait-on": "^8.0.3"
+  },
+  "build": {
+    "appId": "com.eshwaran.personalhub",
+    "productName": "Personal Hub",
+    "copyright": "Copyright © 2025",
+    "directories": {
+      "output": "C:\\Users\\nagar\\Documents\\PersonalHub-Release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Personal Hub"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   }
 }
