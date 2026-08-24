@@ -19,9 +19,7 @@ const IS_CAPACITOR = typeof window !== "undefined" && Capacitor.isNativePlatform
 const ELECTRON_OAUTH_PORT = 45678;
 
 // ── Redirect URIs ─────────────────────────────────────────────────────────────
-// For mobile APK: Google OAuth redirects to the dedicated callback page on GitHub Pages.
-// That page has zero React dependencies and immediately redirects to personalhub://callback.
-const MOBILE_REDIRECT_URI = "https://arthanareeshwaran-14.github.io/personal-hub/oauth-callback.html";
+const MOBILE_REDIRECT_URI = "https://arthanareeshwaran-14.github.io/personal-hub/";
 
 function getRedirectUri() {
   if (IS_ELECTRON) return `http://127.0.0.1:${ELECTRON_OAUTH_PORT}/callback`;
