@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Personal Hub — Signing In...</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Personal Hub - Completing Sign In</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       min-height: 100vh;
       display: flex;
@@ -13,108 +13,143 @@
       justify-content: center;
       flex-direction: column;
       gap: 20px;
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      background: linear-gradient(135deg, #0f0f14 0%, #1a1a2e 100%);
+      padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 60%, #0f172a 100%);
       color: #fff;
+      text-align: center;
     }
     .logo {
-      width: 64px; height: 64px;
-      border-radius: 20px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      width: 72px; height: 72px;
+      border-radius: 22px;
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
       display: flex; align-items: center; justify-content: center;
-      font-size: 28px;
-      box-shadow: 0 8px 32px rgba(99,102,241,0.4);
-      animation: pulse 1.5s ease-in-out infinite;
+      font-size: 32px;
+      box-shadow: 0 0 40px rgba(99,102,241,0.5);
+      animation: glow 1.8s ease-in-out infinite;
+      margin-bottom: 6px;
     }
-    @keyframes pulse {
-      0%, 100% { box-shadow: 0 8px 32px rgba(99,102,241,0.4); }
-      50% { box-shadow: 0 8px 48px rgba(99,102,241,0.7); }
+    @keyframes glow {
+      0%, 100% { box-shadow: 0 0 30px rgba(99,102,241,0.4); }
+      50%       { box-shadow: 0 0 60px rgba(139,92,246,0.7); }
     }
-    h1 { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.5px; }
-    p { color: rgba(255,255,255,0.6); font-size: 0.9rem; }
-    .error {
-      background: rgba(239,68,68,0.15);
-      border: 1px solid rgba(239,68,68,0.3);
-      border-radius: 12px;
-      padding: 14px 20px;
-      color: #f87171;
-      font-size: 0.85rem;
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: #818cf8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h1 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.5px; }
+    p  { color: rgba(255,255,255,0.55); font-size: 0.88rem; line-height: 1.5; max-width: 300px; }
+    .card {
+      background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 20px;
+      padding: 28px 24px;
       max-width: 340px;
-      text-align: center;
-      display: none;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
     }
     .btn {
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
       color: white;
       border: none;
-      border-radius: 12px;
-      padding: 13px 28px;
+      border-radius: 14px;
+      padding: 14px 28px;
       font-size: 0.95rem;
       font-weight: 700;
       cursor: pointer;
-      display: none;
+      width: 100%;
       text-decoration: none;
-      margin-top: 8px;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.4);
+      transition: opacity 0.15s;
     }
+    .btn:active { opacity: 0.8; }
+    .btn-secondary {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      box-shadow: none;
+    }
+    #manual-section { display: none; }
+    #success-icon { display: none; font-size: 2.5rem; }
   </style>
 </head>
 <body>
-  <div class="logo">🔐</div>
-  <h1>Completing Sign In...</h1>
-  <p id="status-msg">Returning you to Personal Hub</p>
-  <div class="error" id="error-box">
-    Could not automatically return to the app.<br>
-    Tap the button below to continue.
+  <div class="logo">&#128272;</div>
+  <div class="card">
+    <div class="spinner" id="spinner"></div>
+    <div id="success-icon">&#9989;</div>
+    <h1 id="title">Completing Sign In</h1>
+    <p id="msg">Returning you to Personal Hub...</p>
+    <div id="manual-section">
+      <a class="btn" id="open-btn" href="#">Open Personal Hub</a>
+      <br/><br/>
+      <a class="btn btn-secondary" id="intent-btn" href="#">Open with App Intent</a>
+    </div>
   </div>
-  <a class="btn" id="open-app-btn" href="#">Open Personal Hub</a>
-
   <script>
-    (function() {
-      // Extract the token fragment from the URL
-      // Google sends: https://.../oauth-callback.html#access_token=...&...
-      var hash   = window.location.hash || '';
-      var search = window.location.search || '';
-
-      var tokenStr = '';
-      if (hash.indexOf('access_token') !== -1) {
-        tokenStr = hash.startsWith('#') ? hash.slice(1) : hash;
-      } else if (search.indexOf('access_token') !== -1) {
-        tokenStr = search.startsWith('?') ? search.slice(1) : search;
-      }
-
-      var errorBox = document.getElementById('error-box');
-      var openBtn  = document.getElementById('open-app-btn');
-      var statusMsg = document.getElementById('status-msg');
-
-      if (!tokenStr) {
-        // No token — maybe user cancelled or an error occurred
-        statusMsg.textContent = 'Sign-in was cancelled or an error occurred.';
-        errorBox.style.display = 'block';
-        openBtn.href = 'personalhub://callback';
-        openBtn.textContent = 'Return to Personal Hub';
-        openBtn.style.display = 'inline-block';
-        return;
-      }
-
-      // Build the deep-link URL for the Android app
-      var deepLink = 'personalhub://callback#' + tokenStr;
-      openBtn.href = deepLink;
-      openBtn.textContent = 'Open Personal Hub';
-
-      // Try to navigate to the deep link — Android intercepts this immediately
+  (function () {
+    var hash   = window.location.hash   || '';
+    var search = window.location.search || '';
+    var tokenStr = '';
+    if (hash.indexOf('access_token') !== -1) {
+      tokenStr = hash.charAt(0) === '#' ? hash.slice(1) : hash;
+    } else if (search.indexOf('access_token') !== -1) {
+      tokenStr = search.charAt(0) === '?' ? search.slice(1) : search;
+    }
+    var title         = document.getElementById('title');
+    var msg           = document.getElementById('msg');
+    var spinner       = document.getElementById('spinner');
+    var successIcon   = document.getElementById('success-icon');
+    var manualSection = document.getElementById('manual-section');
+    var openBtn       = document.getElementById('open-btn');
+    var intentBtn     = document.getElementById('intent-btn');
+    if (!tokenStr) {
+      spinner.style.display = 'none';
+      title.textContent = 'Sign-in Cancelled';
+      msg.textContent = 'No token was received. Please go back and try signing in again.';
+      openBtn.href = 'personalhub://callback';
+      openBtn.textContent = 'Return to Personal Hub';
+      manualSection.style.display = 'block';
+      return;
+    }
+    var deepLink  = 'personalhub://callback#' + tokenStr;
+    var intentUrl = 'intent://callback#' + tokenStr + '#Intent;scheme=personalhub;package=com.eshwaran.personalhub;end';
+    openBtn.href   = deepLink;
+    intentBtn.href = intentUrl;
+    // Strategy 1: direct href
+    try { window.location.href = deepLink; } catch (e) {}
+    // Strategy 2: hidden anchor click
+    setTimeout(function () {
       try {
-        window.location.replace(deepLink);
-      } catch(e) {
-        // Silent fallback — show button
-      }
-
-      // After 1.5s, if user is still here, show manual button
-      setTimeout(function() {
-        errorBox.style.display = 'block';
-        openBtn.style.display = 'inline-block';
-        statusMsg.textContent = 'Almost there! Tap the button to open the app.';
-      }, 1500);
-    })();
+        var a = document.createElement('a');
+        a.href = deepLink; a.style.display = 'none';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      } catch (e) {}
+    }, 200);
+    // Strategy 3: Android intent:// URL
+    setTimeout(function () {
+      try { window.location.href = intentUrl; } catch (e) {}
+    }, 700);
+    // Show manual buttons after 2.5s
+    setTimeout(function () {
+      spinner.style.display     = 'none';
+      successIcon.style.display = 'block';
+      title.textContent = 'Signed In Successfully!';
+      msg.textContent   = 'Tap below if the app did not open automatically.';
+      manualSection.style.display = 'block';
+    }, 2500);
+  })();
   </script>
 </body>
 </html>
